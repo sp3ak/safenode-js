@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["18", "20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify the built package imports (ESM and CJS)
+        run: |
+          npm pack --pack-destination /tmp
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y >/dev/null
+          npm install /tmp/safenode-sdk-*.tgz >/dev/null
+          node --input-type=module -e "
+            import { SafeNode } from 'safenode-sdk';
+            const body = new SafeNode('sn_test_key_0000000000000000')
+              .buildRequest('send_email', { to: 'a@b.com' });
+            if (body.payload.to !== '[REDACTED:email]') throw new Error('ESM: not redacted');
+            console.log('ESM ok');
+          "
+          node --input-type=commonjs -e "
+            const { SafeNode } = require('safenode-sdk');
+            const body = new SafeNode('sn_test_key_0000000000000000')
+              .buildRequest('send_email', { to: 'a@b.com' });
+            if (body.payload.to !== '[REDACTED:email]') throw new Error('CJS: not redacted');
+            console.log('CJS ok');
+          "
+
+      - name: Confirm no install scripts and no runtime dependencies
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const deps = Object.keys(pkg.dependencies || {});
+            if (deps.length) throw new Error('runtime dependencies: ' + deps.join(', '));
+            for (const hook of ['preinstall', 'install', 'postinstall']) {
+              if (pkg.scripts?.[hook]) throw new Error('install script present: ' + hook);
+            }
+            console.log('zero dependencies, no install scripts');
+          "
+
+  publish:
+    name: Publish to npm
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - run: npm ci
+
+      - name: Check the tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag v$TAG does not match package.json version $PKG" >&2
+            exit 1
+          fi
+
+      - run: npm run build
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
