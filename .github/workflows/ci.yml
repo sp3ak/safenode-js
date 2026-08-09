@@ -86,9 +86,15 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: "22"
+          # Node 24 ships npm 11.x. Node 22 ships npm 10.9.x, which predates OIDC support.
+          node-version: "24"
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      # Trusted publishing needs npm >= 11.5.1. Pinned explicitly rather than trusting whatever
+      # the runner image happens to bundle, because the failure mode is an auth error that says
+      # nothing about versions.
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
@@ -103,6 +109,6 @@ jobs:
 
       - run: npm run build
 
+      # No NODE_AUTH_TOKEN: authentication comes from the OIDC trusted publisher configured on
+      # npmjs.com for this package (sp3ak/safenode-js, ci.yml, no environment).
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
