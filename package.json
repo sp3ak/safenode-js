@@ -1,6 +1,6 @@
 {
   "name": "safenode-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Policy firewall for AI agent actions. Evaluate what your agent is about to do, before it does it.",
   "keywords": [
     "ai-agents",

@@ -10,6 +10,18 @@ While the version is below 1.0.0, minor releases may change the TypeScript surfa
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-09
+
+No functional change to the SDK. Released to verify that publishing works over OIDC trusted
+publishing rather than a long-lived npm token.
+
+### Changed
+
+- Publishes via OIDC trusted publishing. No npm token exists to leak or rotate.
+- The publish job runs Node 24 and pins `npm@latest`. Node 22 ships npm 10.9.x, which predates OIDC
+  support (needs >= 11.5.1); without this the publish fails with an auth error that mentions
+  nothing about versions.
+
 ## [0.1.0] - 2026-08-08
 
 First release. A port of the SafeNode Python SDK 0.1.0, mirroring its options (in camelCase),
@@ -48,5 +60,6 @@ result fields, fail modes, redaction rules, and error taxonomy.
 - Deliberate divergences from the Python SDK are listed in the README under
   "Differences from the Python SDK".
 
-[Unreleased]: https://github.com/sp3ak/safenode-js/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sp3ak/safenode-js/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/sp3ak/safenode-js/releases/tag/v0.1.1
 [0.1.0]: https://github.com/sp3ak/safenode-js/releases/tag/v0.1.0
